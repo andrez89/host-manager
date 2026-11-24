@@ -1,4 +1,7 @@
-use crate::store::Site;
+use crate::{
+    i18n::{Language, Text},
+    store::Site,
+};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -58,7 +61,7 @@ pub fn apply(sites: &[Site]) -> Result<(), String> {
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|e| format!("Avvio pkexec: {e}"))?;
+            .map_err(|e| format!("{}: {e}", Language::system().text(Text::PkexecStart)))?;
         child
             .stdin
             .take()
@@ -113,7 +116,7 @@ fn elevated_apply(exe: &Path, payload: &Path) -> Result<(), String> {
     command_result(
         output.status.success(),
         &output.stderr,
-        "Autorizzazione amministratore annullata",
+        Language::system().text(Text::MacAuthDenied),
     )
 }
 
@@ -126,7 +129,9 @@ fn shell_quote(path: &Path) -> String {
 fn elevated_apply(exe: &Path, payload: &Path) -> Result<(), String> {
     let exe = powershell_quote(exe);
     let payload = powershell_quote(payload);
-    let script = format!("$p = Start-Process -FilePath {exe} -ArgumentList '--apply-file \"{payload}\"' -Verb RunAs -Wait -PassThru; exit $p.ExitCode");
+    let script = format!(
+        "$p = Start-Process -FilePath {exe} -ArgumentList '--apply-file \"{payload}\"' -Verb RunAs -Wait -PassThru; exit $p.ExitCode"
+    );
     let output = Command::new("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
         .output()
@@ -134,7 +139,7 @@ fn elevated_apply(exe: &Path, payload: &Path) -> Result<(), String> {
     command_result(
         output.status.success(),
         &output.stderr,
-        "Richiesta UAC annullata",
+        Language::system().text(Text::WindowsAuthDenied),
     )
 }
 
@@ -184,7 +189,7 @@ fn apply_sites(sites: &[Site]) -> Result<(), String> {
 
 fn render_hosts(text: &str, sites: &[Site]) -> Result<String, String> {
     if sites.iter().any(|s| !valid_domain(&s.domain)) {
-        return Err("Dominio non valido".into());
+        return Err(Language::system().text(Text::InvalidDomain).into());
     }
     let mut lines: Vec<String> = text
         .lines()

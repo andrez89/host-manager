@@ -1,4 +1,5 @@
 mod hosts;
+mod i18n;
 mod store;
 mod ui;
 
@@ -13,7 +14,10 @@ fn main() {
         }
         Some("--apply-file") => {
             let Some(path) = args.next() else {
-                eprintln!("Percorso del payload mancante");
+                eprintln!(
+                    "{}",
+                    i18n::Language::system().text(i18n::Text::MissingPayload)
+                );
                 std::process::exit(1);
             };
             if let Err(error) = hosts::apply_from_file(std::path::Path::new(&path)) {

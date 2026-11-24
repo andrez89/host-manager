@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            platform: linux
+          - os: macos-15
+            target: aarch64-apple-darwin
+            platform: macos
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            platform: macos
+          - os: windows-2025
+            target: x86_64-pc-windows-gnu
+            platform: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - if: matrix.platform == 'windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gtk4 mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-gcc
+      - if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev pkg-config
+        shell: ${{ matrix.platform == 'windows' && 'msys2 {0}' || 'bash' }}
+      - if: matrix.platform == 'macos'
+        run: brew install gtk4 pkg-config
+        shell: ${{ matrix.platform == 'windows' && 'msys2 {0}' || 'bash' }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
+          components: rustfmt
+      - if: matrix.platform == 'windows'
+        run: echo 'CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc' >> "$GITHUB_ENV"
+        shell: ${{ matrix.platform == 'windows' && 'msys2 {0}' || 'bash' }}
+      - run: cargo fmt --all -- --check
+        shell: ${{ matrix.platform == 'windows' && 'msys2 {0}' || 'bash' }}
+      - run: cargo check --locked --target ${{ matrix.target }}
+        shell: ${{ matrix.platform == 'windows' && 'msys2 {0}' || 'bash' }}
+      - run: cargo test --locked --target ${{ matrix.target }}
+        shell: ${{ matrix.platform == 'windows' && 'msys2 {0}' || 'bash' }}
